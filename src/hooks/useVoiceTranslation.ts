@@ -36,10 +36,11 @@ export function useVoiceTranslation({
   const streamRef = useRef<MediaStream | null>(null);
   const audioQueueRef = useRef<HTMLAudioElement[]>([]);
   const isPlayingRef = useRef(false);
-  const wsRef = useRef<WebSocket | null>(null);
-  const accumulatedTextRef = useRef("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const lastTranslationTimeRef = useRef(0);
   const translationDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const accumulatedTextRef = useRef("");
 
   const updateStatus = useCallback((newStatus: TranslationStatus) => {
     setStatus(newStatus);
@@ -121,11 +122,11 @@ export function useVoiceTranslation({
         clearTimeout(translationDebounceRef.current);
       }
       
-      // Only translate if 300ms has passed since last translation
-      if (now - lastTranslationTimeRef.current < 300) {
+      // Only translate if 500ms has passed since last translation
+      if (now - lastTranslationTimeRef.current < 500) {
         translationDebounceRef.current = setTimeout(() => {
           translateText(text, false);
-        }, 300);
+        }, 500);
         return;
       }
     }
@@ -165,14 +166,20 @@ export function useVoiceTranslation({
           // Show as partial/preview
           setPartialTranscript(data.translatedText);
         }
+        
+        // Go back to recording if we're still active
+        if (recognitionRef.current && status !== "speaking") {
+          updateStatus("recording");
+        }
       }
     } catch (err) {
       console.error("Translation error:", err);
       setError("Translation failed");
+      updateStatus("recording");
     }
-  }, [sourceLang, targetLang, updateStatus, synthesizeSpeech]);
+  }, [sourceLang, targetLang, updateStatus, synthesizeSpeech, status]);
 
-  // Start recording with ElevenLabs Scribe
+  // Start recording using Web Speech API (works in browsers)
   const startRecording = useCallback(async () => {
     try {
       setError(null);
@@ -180,12 +187,11 @@ export function useVoiceTranslation({
       setPartialTranscript("");
       accumulatedTextRef.current = "";
 
-      // Get microphone access
+      // Get microphone access for visualization
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          sampleRate: 16000,
         } 
       });
       streamRef.current = stream;
@@ -197,100 +203,93 @@ export function useVoiceTranslation({
       source.connect(analyserRef.current);
       analyserRef.current.fftSize = 256;
 
-      // Get scribe token
-      const { data: tokenData, error: tokenError } = await supabase.functions.invoke(
-        "elevenlabs-scribe-token"
-      );
-
-      if (tokenError || !tokenData?.token) {
-        throw new Error("Failed to get transcription token");
+      // Use Web Speech API for speech recognition
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        throw new Error("Speech recognition not supported in this browser. Please use Chrome or Edge.");
       }
 
-      // Connect to ElevenLabs Scribe WebSocket
-      const ws = new WebSocket("wss://api.elevenlabs.io/v1/scribe");
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        // Send initial config
-        ws.send(JSON.stringify({
-          type: "configure",
-          token: tokenData.token,
-          model_id: "scribe_v2_realtime",
-          language_code: getLanguageCode(sourceLang),
-          sample_rate: 16000,
-        }));
-
+      const recognition = new SpeechRecognition();
+      recognitionRef.current = recognition;
+      
+      // Configure recognition
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = getLanguageCode(sourceLang);
+      
+      recognition.onstart = () => {
         updateStatus("recording");
-
-        // Start sending audio chunks
-        const mediaRecorder = new MediaRecorder(stream, {
-          mimeType: "audio/webm;codecs=opus",
-        });
-        mediaRecorderRef.current = mediaRecorder;
-
-        mediaRecorder.ondataavailable = async (event) => {
-          if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
-            const arrayBuffer = await event.data.arrayBuffer();
-            const base64 = btoa(
-              String.fromCharCode(...new Uint8Array(arrayBuffer))
-            );
-            ws.send(JSON.stringify({
-              type: "audio",
-              data: base64,
-            }));
-          }
-        };
-
-        mediaRecorder.start(100); // Send chunks every 100ms
       };
 
-      ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        
-        if (message.type === "partial_transcript") {
-          const partialText = message.text || "";
-          setPartialTranscript(partialText);
+      recognition.onresult = (event) => {
+        let interimTranscript = "";
+        let finalTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
           
-          // Translate partial for preview
-          if (partialText.length > 10) {
-            translateText(partialText, false);
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
           }
-        } else if (message.type === "committed_transcript") {
-          const committedText = message.text || "";
-          
-          if (committedText.trim()) {
-            translateText(committedText, true);
+        }
+
+        // Handle interim results (partial)
+        if (interimTranscript) {
+          setPartialTranscript(interimTranscript);
+          if (interimTranscript.length > 15) {
+            translateText(interimTranscript, false);
+          }
+        }
+
+        // Handle final results (committed)
+        if (finalTranscript) {
+          setPartialTranscript("");
+          translateText(finalTranscript.trim(), true);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === "not-allowed") {
+          setError("Microphone permission denied");
+        } else if (event.error !== "no-speech") {
+          setError(`Recognition error: ${event.error}`);
+        }
+      };
+
+      recognition.onend = () => {
+        // Auto-restart if still supposed to be recording
+        if (recognitionRef.current && status === "recording") {
+          try {
+            recognition.start();
+          } catch (e) {
+            // Already started or stopped
           }
         }
       };
 
-      ws.onerror = (err) => {
-        console.error("WebSocket error:", err);
-        setError("Connection error");
-        stopRecording();
-      };
-
-      ws.onclose = () => {
-        console.log("WebSocket closed");
-      };
+      recognition.start();
 
     } catch (err) {
       console.error("Recording error:", err);
       setError(err instanceof Error ? err.message : "Failed to start recording");
       updateStatus("idle");
     }
-  }, [sourceLang, updateStatus, translateText]);
+  }, [sourceLang, updateStatus, translateText, status]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current = null;
-    }
-
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
     }
 
     if (streamRef.current) {
@@ -301,6 +300,10 @@ export function useVoiceTranslation({
     if (audioContextRef.current) {
       audioContextRef.current.close();
       audioContextRef.current = null;
+    }
+
+    if (translationDebounceRef.current) {
+      clearTimeout(translationDebounceRef.current);
     }
 
     updateStatus("idle");
@@ -335,23 +338,69 @@ export function useVoiceTranslation({
     startRecording,
     stopRecording,
     getAudioLevels,
-    isRecording: status === "recording",
+    isRecording: status !== "idle",
   };
 }
 
-// Helper to map language names to codes
+// Helper to map language names to BCP-47 codes for Web Speech API
 function getLanguageCode(lang: string): string {
   const codes: Record<string, string> = {
-    Tamil: "tam",
-    Hindi: "hin",
-    Telugu: "tel",
-    Bengali: "ben",
-    Marathi: "mar",
-    Kannada: "kan",
-    Malayalam: "mal",
-    Gujarati: "guj",
-    Punjabi: "pan",
-    English: "eng",
+    Tamil: "ta-IN",
+    Hindi: "hi-IN",
+    Telugu: "te-IN",
+    Bengali: "bn-IN",
+    Marathi: "mr-IN",
+    Kannada: "kn-IN",
+    Malayalam: "ml-IN",
+    Gujarati: "gu-IN",
+    Punjabi: "pa-IN",
+    English: "en-US",
   };
-  return codes[lang] || "tam";
+  return codes[lang] || "ta-IN";
+}
+
+// Add type declarations for Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognitionInterface extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognitionInterface;
+    webkitSpeechRecognition: new () => SpeechRecognitionInterface;
+  }
 }
