@@ -5,30 +5,75 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const VALID_LANGS = [
+  "Tamil", "Hindi", "Telugu", "Bengali", "Marathi",
+  "Kannada", "Malayalam", "Gujarati", "Punjabi", "English",
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+
   try {
-    const { text, sourceLang, targetLang } = await req.json();
-    
-    if (!text || text.trim() === "") {
+    // Require Authorization header (JWT verified by verify_jwt=true at platform)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return new Response(
+        JSON.stringify({ error: "Invalid request" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { text, sourceLang, targetLang } = body as {
+      text?: unknown; sourceLang?: unknown; targetLang?: unknown;
+    };
+
+    if (typeof text !== "string" || text.trim() === "") {
       return new Response(
         JSON.stringify({ translatedText: "", isPartial: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    if (text.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: "Text must be 5000 characters or fewer" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (
+      typeof sourceLang !== "string" || typeof targetLang !== "string" ||
+      !VALID_LANGS.includes(sourceLang) || !VALID_LANGS.includes(targetLang)
+    ) {
+      return new Response(
+        JSON.stringify({ error: "Invalid language selection" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      console.error(`[${requestId}] LOVABLE_API_KEY not configured`);
+      return new Response(
+        JSON.stringify({ error: "Service temporarily unavailable", requestId }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const startTime = Date.now();
 
-    // Optimized prompt for medical translation with low latency
     const systemPrompt = `You are a real-time medical interpreter. Translate the following ${sourceLang} speech fragment to ${targetLang}.
 
 CRITICAL RULES:
@@ -49,52 +94,51 @@ CRITICAL RULES:
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: text }
+          { role: "user", content: text },
         ],
         max_tokens: 500,
-        temperature: 0.1, // Low temperature for accuracy
+        temperature: 0.1,
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error(`[${requestId}] AI gateway error:`, response.status, errorText);
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again." }),
+          JSON.stringify({ error: "Service is busy, please try again", requestId }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "Payment required. Please add credits." }),
+          JSON.stringify({ error: "Service temporarily unavailable", requestId }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      const errorText = await response.text();
-      console.error("Translation error:", response.status, errorText);
-      throw new Error("Translation failed");
+      return new Response(
+        JSON.stringify({ error: "Unable to process request", requestId }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const data = await response.json();
     const translatedText = data.choices?.[0]?.message?.content || "";
-    
     const latency = Date.now() - startTime;
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         translatedText: translatedText.trim(),
         latency,
-        isPartial: text.length < 50 // Heuristic for partial text
+        isPartial: text.length < 50,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Translate error:", error);
+    console.error(`[${requestId}] Translate error:`, error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: "Unable to process request", requestId }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
