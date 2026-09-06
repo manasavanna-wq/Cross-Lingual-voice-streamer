@@ -44,7 +44,7 @@ export function LanguageSelector({
     <div className="flex items-center gap-4">
       <div className="flex-1">
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-          Patient speaks
+          Hearer speaks
         </label>
         <Select value={sourceLang} onValueChange={onSourceChange} disabled={disabled}>
           <SelectTrigger className="w-full bg-secondary/50 border-0 h-11">
@@ -68,7 +68,7 @@ export function LanguageSelector({
 
       <div className="flex-1">
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-          Doctor hears
+          Listener hears
         </label>
         <Select value={targetLang} onValueChange={onTargetChange} disabled={disabled}>
           <SelectTrigger className="w-full bg-secondary/50 border-0 h-11">

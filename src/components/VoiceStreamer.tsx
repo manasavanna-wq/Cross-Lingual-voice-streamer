@@ -70,11 +70,11 @@ export function VoiceStreamer() {
         {/* Header */}
         <header className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-bold gradient-text">
-            Cross-Lingual Voice Streamer
+            Trans-Web
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Real-time medical translation from regional languages to English. 
-            Breaking language barriers in healthcare consultations.
+            Real-time translation between a Hearer and a Listener.
+            Breaking language barriers in live conversations.
           </p>
         </header>
 
@@ -95,7 +95,7 @@ export function VoiceStreamer() {
           {/* Voice Selection */}
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground">
-              Doctor's voice
+              Listener's voice
             </label>
             <RadioGroup
               value={voice}
@@ -124,7 +124,7 @@ export function VoiceStreamer() {
               <div className="flex items-center gap-2 mb-2">
                 <Mic className="w-4 h-4 text-voice-input" />
                 <span className="text-xs font-medium text-muted-foreground">
-                  Patient Audio
+                  Hearer Audio
                 </span>
               </div>
               <AudioWaveform
@@ -138,7 +138,7 @@ export function VoiceStreamer() {
               <div className="flex items-center gap-2 mb-2">
                 <Volume2 className="w-4 h-4 text-voice-output" />
                 <span className="text-xs font-medium text-muted-foreground">
-                  Doctor Audio
+                  Listener Audio
                 </span>
               </div>
               <AudioWaveform
