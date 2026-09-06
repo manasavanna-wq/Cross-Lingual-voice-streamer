@@ -152,6 +152,12 @@ export function useVoiceTranslation({
       }
     }
 
+    // A committed sentence supersedes any pending partial request
+    if (isCommitted && translationDebounceRef.current) {
+      clearTimeout(translationDebounceRef.current);
+      translationDebounceRef.current = null;
+    }
+
     lastTranslationTimeRef.current = now;
     updateStatus("translating");
 
