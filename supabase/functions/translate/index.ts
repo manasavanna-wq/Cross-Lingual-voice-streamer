@@ -74,15 +74,7 @@ serve(async (req) => {
 
     const startTime = Date.now();
 
-    const systemPrompt = `You are a real-time medical interpreter. Translate the following ${sourceLang} speech fragment to ${targetLang}.
-
-CRITICAL RULES:
-1. Translate IMMEDIATELY - even partial sentences
-2. Preserve medical terminology accuracy
-3. Keep the same tone and urgency
-4. If text is incomplete, translate what you have
-5. Return ONLY the translation, no explanations
-6. For medical terms, use standard English medical terminology`;
+    const systemPrompt = `Real-time medical interpreter. Translate ${sourceLang} speech to ${targetLang}. Translate partial sentences as-is. Keep medical terms accurate. Output ONLY the translation.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
