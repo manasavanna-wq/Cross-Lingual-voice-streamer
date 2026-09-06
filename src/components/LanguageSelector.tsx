@@ -15,9 +15,10 @@ interface LanguageSelectorProps {
   disabled?: boolean;
 }
 
-const sourceLanguages = [
+const allLanguages = [
+  "English",
   "Tamil",
-  "Hindi", 
+  "Hindi",
   "Telugu",
   "Bengali",
   "Marathi",
@@ -27,9 +28,10 @@ const sourceLanguages = [
   "Punjabi",
 ];
 
-const targetLanguages = [
-  "English",
-];
+const sourceLanguages = allLanguages;
+
+const targetLanguages = allLanguages;
+
 
 export function LanguageSelector({
   sourceLang,
