@@ -98,6 +98,7 @@ export function useVoiceTranslation({
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
+      audio.preload = "auto";
       
       audioQueueRef.current.push(audio);
       
@@ -109,6 +110,26 @@ export function useVoiceTranslation({
       console.error("TTS error:", err);
     }
   }, [voice, playNextAudio, updateStatus]);
+
+  // Split into sentence-sized chunks so the first audio starts sooner
+  const synthesizeSpeech = useCallback(async (text: string) => {
+    const chunks = text
+      .split(/(?<=[.!?،。？！])\s+/)
+      .map(c => c.trim())
+      .filter(Boolean);
+
+    const merged: string[] = [];
+    for (const c of chunks) {
+      const last = merged[merged.length - 1];
+      if (last && last.length < 40) merged[merged.length - 1] = `${last} ${c}`;
+      else merged.push(c);
+    }
+
+    // Sequential so playback order is preserved, but the first chunk starts fast
+    for (const chunk of merged.length ? merged : [text]) {
+      await synthesizeChunk(chunk);
+    }
+  }, [synthesizeChunk]);
 
   // Translation with debouncing for incremental updates
   const translateText = useCallback(async (text: string, isCommitted: boolean) => {
@@ -122,11 +143,11 @@ export function useVoiceTranslation({
         clearTimeout(translationDebounceRef.current);
       }
       
-      // Only translate if 500ms has passed since last translation
-      if (now - lastTranslationTimeRef.current < 500) {
+      // Throttle partial translations (short window keeps preview snappy)
+      if (now - lastTranslationTimeRef.current < 250) {
         translationDebounceRef.current = setTimeout(() => {
           translateText(text, false);
-        }, 500);
+        }, 250);
         return;
       }
     }
