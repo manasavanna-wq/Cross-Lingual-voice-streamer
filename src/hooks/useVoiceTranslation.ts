@@ -73,8 +73,8 @@ export function useVoiceTranslation({
     audio.play().catch(() => playNextAudio());
   }, [status, updateStatus]);
 
-  // Text-to-speech
-  const synthesizeSpeech = useCallback(async (text: string) => {
+  // Text-to-speech (single chunk)
+  const synthesizeChunk = useCallback(async (text: string) => {
     if (!text.trim()) return;
 
     try {
