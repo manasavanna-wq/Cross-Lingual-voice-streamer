@@ -90,7 +90,7 @@ export function useVoiceTranslation({
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text, voice }),
+          body: JSON.stringify({ text, voice, ...(clonedVoiceId ? { voiceId: clonedVoiceId } : {}) }),
         }
       );
 
@@ -112,7 +112,7 @@ export function useVoiceTranslation({
     } catch (err) {
       console.error("TTS error:", err);
     }
-  }, [voice, playNextAudio, updateStatus]);
+  }, [voice, clonedVoiceId, playNextAudio, updateStatus]);
 
   // Split into sentence-sized chunks so the first audio starts sooner
   const synthesizeSpeech = useCallback(async (text: string) => {
