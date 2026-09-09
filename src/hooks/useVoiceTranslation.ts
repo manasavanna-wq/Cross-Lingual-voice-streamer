@@ -15,6 +15,7 @@ interface UseVoiceTranslationOptions {
   sourceLang: string;
   targetLang: string;
   voice: "male" | "female";
+  clonedVoiceId?: string | null;
   onStatusChange?: (status: TranslationStatus) => void;
 }
 
@@ -22,8 +23,10 @@ export function useVoiceTranslation({
   sourceLang,
   targetLang,
   voice,
+  clonedVoiceId,
   onStatusChange,
 }: UseVoiceTranslationOptions) {
+
   const [status, setStatus] = useState<TranslationStatus>("idle");
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [partialTranscript, setPartialTranscript] = useState("");
