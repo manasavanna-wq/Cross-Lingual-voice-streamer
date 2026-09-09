@@ -70,12 +70,32 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       console.error(`[${requestId}] Voice clone error:`, response.status, errorText);
-      const message =
-        response.status === 401 || response.status === 403
-          ? "Voice cloning is not available on the current voice service plan."
-          : "Unable to create the voice right now.";
+
+      let code = "";
+      try {
+        code = JSON.parse(errorText)?.detail?.status || JSON.parse(errorText)?.detail?.code || "";
+      } catch { /* not json */ }
+
+      let message = "Something went wrong making your voice. Please try again.";
+      let retryable = true;
+
+      if (code === "can_not_use_instant_voice_cloning" || code === "paid_plan_required") {
+        message =
+          "Making a copy of your voice needs a paid plan on the voice service. Your translations will keep using the standard voice.";
+        retryable = false;
+      } else if (code === "voice_limit_reached") {
+        message = "The voice service has reached its saved-voice limit. Remove an old voice and try again.";
+      } else if (code === "invalid_audio" || response.status === 422) {
+        message = "That recording was too quiet or unclear. Find a quiet spot and record again.";
+      } else if (response.status === 401 || response.status === 403) {
+        message = "The voice service rejected the request. Please try again later.";
+        retryable = false;
+      } else if (response.status === 429) {
+        message = "The voice service is busy right now. Wait a moment and try again.";
+      }
+
       return new Response(
-        JSON.stringify({ error: message, requestId }),
+        JSON.stringify({ error: message, retryable, requestId }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
