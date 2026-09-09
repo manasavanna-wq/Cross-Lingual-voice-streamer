@@ -15,6 +15,7 @@ interface UseVoiceTranslationOptions {
   sourceLang: string;
   targetLang: string;
   voice: "male" | "female";
+  clonedVoiceId?: string | null;
   onStatusChange?: (status: TranslationStatus) => void;
 }
 
@@ -22,8 +23,10 @@ export function useVoiceTranslation({
   sourceLang,
   targetLang,
   voice,
+  clonedVoiceId,
   onStatusChange,
 }: UseVoiceTranslationOptions) {
+
   const [status, setStatus] = useState<TranslationStatus>("idle");
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const [partialTranscript, setPartialTranscript] = useState("");
@@ -87,7 +90,7 @@ export function useVoiceTranslation({
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text, voice }),
+          body: JSON.stringify({ text, voice, ...(clonedVoiceId ? { voiceId: clonedVoiceId } : {}) }),
         }
       );
 
@@ -109,7 +112,7 @@ export function useVoiceTranslation({
     } catch (err) {
       console.error("TTS error:", err);
     }
-  }, [voice, playNextAudio, updateStatus]);
+  }, [voice, clonedVoiceId, playNextAudio, updateStatus]);
 
   // Split into sentence-sized chunks so the first audio starts sooner
   const synthesizeSpeech = useCallback(async (text: string) => {

@@ -34,7 +34,9 @@ serve(async (req) => {
       );
     }
 
-    const { text, voice = "female" } = body as { text?: unknown; voice?: unknown };
+    const { text, voice = "female", voiceId: customVoiceId } = body as {
+      text?: unknown; voice?: unknown; voiceId?: unknown;
+    };
 
     if (typeof text !== "string" || text.trim() === "") {
       return new Response(
@@ -57,6 +59,16 @@ serve(async (req) => {
       );
     }
 
+    if (
+      customVoiceId !== undefined &&
+      (typeof customVoiceId !== "string" || !/^[A-Za-z0-9]{16,40}$/.test(customVoiceId))
+    ) {
+      return new Response(
+        JSON.stringify({ error: "Invalid voice id" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
       console.error(`[${requestId}] ELEVENLABS_API_KEY not configured`);
@@ -66,7 +78,8 @@ serve(async (req) => {
       );
     }
 
-    const voiceId = VOICE_IDS[voice as keyof typeof VOICE_IDS];
+    const voiceId = (customVoiceId as string | undefined) ?? VOICE_IDS[voice as keyof typeof VOICE_IDS];
+
     const startTime = Date.now();
 
     const response = await fetch(
