@@ -128,7 +128,7 @@ export function VoiceStreamer() {
               value={voice}
               onValueChange={(v) => setVoice(v as "male" | "female")}
               className="flex gap-4"
-              disabled={isRecording || (useMyVoice && !!clonedVoiceId)}
+              disabled={isRecording || (useMyVoice && !!selectedVoiceId)}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="female" id="female" />
