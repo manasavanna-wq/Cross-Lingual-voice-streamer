@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Mic, MicOff, Volume2, AlertCircle, UserRound, Loader2, Square, Trash2 } from "lucide-react";
+import { Mic, MicOff, Volume2, AlertCircle, UserRound, Loader2, Square, Trash2, Check, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -18,17 +19,23 @@ export function VoiceStreamer() {
   const [targetLang, setTargetLang] = useState("English");
   const [voice, setVoice] = useState<"male" | "female">("female");
   const [useMyVoice, setUseMyVoice] = useState(true);
+  const [newVoiceName, setNewVoiceName] = useState("");
   const [audioLevels, setAudioLevels] = useState<Uint8Array>(new Uint8Array(32));
 
   const {
-    clonedVoiceId,
+    voices,
+    selectedVoiceId,
+    selectVoice,
     isSampling,
     isCloning,
     cloneError,
+    canRetry,
     secondsRecorded,
     startSampling,
     stopSampling,
-    clearClone,
+    retryUpload,
+    removeVoice,
+    dismissError,
   } = useVoiceClone();
 
   const {
@@ -45,8 +52,9 @@ export function VoiceStreamer() {
     sourceLang,
     targetLang,
     voice,
-    clonedVoiceId: useMyVoice ? clonedVoiceId : null,
+    clonedVoiceId: useMyVoice ? selectedVoiceId : null,
   });
+
 
 
   // Update audio levels for visualization
@@ -71,15 +79,8 @@ export function VoiceStreamer() {
     }
   }, [error, toast]);
 
-  useEffect(() => {
-    if (cloneError) {
-      toast({
-        variant: "destructive",
-        title: "Voice copy failed",
-        description: cloneError,
-      });
-    }
-  }, [cloneError, toast]);
+
+
 
 
   const handleToggleRecording = useCallback(() => {
@@ -127,7 +128,7 @@ export function VoiceStreamer() {
               value={voice}
               onValueChange={(v) => setVoice(v as "male" | "female")}
               className="flex gap-4"
-              disabled={isRecording || (useMyVoice && !!clonedVoiceId)}
+              disabled={isRecording || (useMyVoice && !!selectedVoiceId)}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="female" id="female" />
@@ -144,21 +145,21 @@ export function VoiceStreamer() {
             </RadioGroup>
           </div>
 
-          {/* My Voice (voice copy) */}
-          <div className="rounded-xl border border-border/60 p-4 space-y-3">
+          {/* My Voice Bank */}
+          <div className="rounded-xl border border-border/60 p-4 space-y-4">
             <div className="flex items-start gap-3">
               <UserRound className="w-5 h-5 text-primary shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">Speak in my own voice</p>
+                <p className="text-sm font-medium text-foreground">My voice bank</p>
                 <p className="text-xs text-muted-foreground">
-                  Record about 30 seconds of yourself talking. The translation is then
-                  spoken back in a voice that sounds like you.
+                  Record about 30 seconds of talking to save a voice copy. Save as many as
+                  you like and pick one to speak the translations for this session.
                 </p>
               </div>
             </div>
 
-            {clonedVoiceId ? (
-              <div className="flex flex-wrap items-center gap-3">
+            {voices.length > 0 && (
+              <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
@@ -167,23 +168,53 @@ export function VoiceStreamer() {
                     disabled={isRecording}
                     onChange={(e) => setUseMyVoice(e.target.checked)}
                   />
-                  Use my voice
+                  Use a saved voice
                 </label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={isRecording}
-                  onClick={clearClone}
-                  className="text-muted-foreground"
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Remove
-                </Button>
+
+                <ul className="space-y-1">
+                  {voices.map((v) => {
+                    const active = useMyVoice && v.id === selectedVoiceId;
+                    return (
+                      <li
+                        key={v.id}
+                        className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${
+                          active ? "border-primary bg-primary/5" : "border-border/60"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          disabled={isRecording || !useMyVoice}
+                          onClick={() => selectVoice(v.id)}
+                          className="flex items-center gap-2 text-sm text-left flex-1 disabled:opacity-60"
+                        >
+                          {active ? (
+                            <Check className="w-4 h-4 text-primary shrink-0" />
+                          ) : (
+                            <span className="w-4 h-4 shrink-0" />
+                          )}
+                          <span className="truncate">{v.name}</span>
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={isRecording}
+                          onClick={() => removeVoice(v.id)}
+                          className="text-muted-foreground"
+                          aria-label={`Remove ${v.name}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-            ) : isCloning ? (
+            )}
+
+            {isCloning ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Creating your voice...
+                Saving your voice...
               </div>
             ) : isSampling ? (
               <div className="flex items-center gap-3">
@@ -196,17 +227,48 @@ export function VoiceStreamer() {
                 </span>
               </div>
             ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={isRecording}
-                onClick={startSampling}
-              >
-                <Mic className="w-4 h-4 mr-1" />
-                Record my voice
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={newVoiceName}
+                  onChange={(e) => setNewVoiceName(e.target.value)}
+                  placeholder="Name this voice (optional)"
+                  disabled={isRecording}
+                  className="h-9 w-56"
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={isRecording}
+                  onClick={() => {
+                    void startSampling(newVoiceName);
+                    setNewVoiceName("");
+                  }}
+                >
+                  <Mic className="w-4 h-4 mr-1" />
+                  Record a new voice
+                </Button>
+              </div>
+            )}
+
+            {cloneError && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+                <p className="text-sm text-foreground">{cloneError}</p>
+                <div className="flex items-center gap-2">
+                  {canRetry && (
+                    <Button size="sm" variant="secondary" onClick={retryUpload}>
+                      <RotateCcw className="w-4 h-4 mr-1" />
+                      Try again
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={dismissError}>
+                    <X className="w-4 h-4 mr-1" />
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
+
 
 
           {/* Audio Visualizers */}
