@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Mic, MicOff, Volume2, AlertCircle, UserRound, Loader2, Square, Trash2 } from "lucide-react";
+import { Mic, MicOff, Volume2, AlertCircle, UserRound, Loader2, Square, Trash2, Check, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -18,17 +19,23 @@ export function VoiceStreamer() {
   const [targetLang, setTargetLang] = useState("English");
   const [voice, setVoice] = useState<"male" | "female">("female");
   const [useMyVoice, setUseMyVoice] = useState(true);
+  const [newVoiceName, setNewVoiceName] = useState("");
   const [audioLevels, setAudioLevels] = useState<Uint8Array>(new Uint8Array(32));
 
   const {
-    clonedVoiceId,
+    voices,
+    selectedVoiceId,
+    selectVoice,
     isSampling,
     isCloning,
     cloneError,
+    canRetry,
     secondsRecorded,
     startSampling,
     stopSampling,
-    clearClone,
+    retryUpload,
+    removeVoice,
+    dismissError,
   } = useVoiceClone();
 
   const {
@@ -45,8 +52,9 @@ export function VoiceStreamer() {
     sourceLang,
     targetLang,
     voice,
-    clonedVoiceId: useMyVoice ? clonedVoiceId : null,
+    clonedVoiceId: useMyVoice ? selectedVoiceId : null,
   });
+
 
 
   // Update audio levels for visualization
