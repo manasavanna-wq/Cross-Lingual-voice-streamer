@@ -79,15 +79,8 @@ export function VoiceStreamer() {
     }
   }, [error, toast]);
 
-  useEffect(() => {
-    if (cloneError) {
-      toast({
-        variant: "destructive",
-        title: "Voice copy failed",
-        description: cloneError,
-      });
-    }
-  }, [cloneError, toast]);
+
+
 
 
   const handleToggleRecording = useCallback(() => {
