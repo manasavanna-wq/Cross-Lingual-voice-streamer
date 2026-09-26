@@ -339,8 +339,22 @@ export function useVoiceTranslation({
     }
 
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
+      const recorder = mediaRecorderRef.current;
       mediaRecorderRef.current = null;
+      const mimeType = recorder.mimeType || "audio/webm";
+      const seconds = Math.round((Date.now() - sessionStartRef.current) / 1000);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) sessionChunksRef.current.push(e.data);
+        const blob = new Blob(sessionChunksRef.current, { type: mimeType });
+        if (blob.size > 10_000 && seconds >= 1) {
+          setSessionAudio({ blob, seconds });
+        }
+      };
+      try {
+        recorder.stop();
+      } catch {
+        /* already stopped */
+      }
     }
 
     if (streamRef.current) {
@@ -389,6 +403,8 @@ export function useVoiceTranslation({
     startRecording,
     stopRecording,
     getAudioLevels,
+    sessionAudio,
+    clearSessionAudio: () => setSessionAudio(null),
     isRecording: status !== "idle",
   };
 }

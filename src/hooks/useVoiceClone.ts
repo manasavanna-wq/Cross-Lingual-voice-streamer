@@ -156,6 +156,15 @@ export function useVoiceClone() {
     if (lastBlobRef.current) void uploadSample(lastBlobRef.current);
   }, [uploadSample]);
 
+  // Save an externally captured sample (e.g. the hearer's session audio)
+  const saveSample = useCallback(
+    (blob: Blob, name?: string) => {
+      pendingNameRef.current = (name || "").trim() || `Voice ${voices.length + 1}`;
+      void uploadSample(blob);
+    },
+    [uploadSample, voices.length]
+  );
+
   const startSampling = useCallback(
     async (name?: string) => {
       pendingNameRef.current = (name || "").trim() || `Voice ${voices.length + 1}`;
