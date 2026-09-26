@@ -152,7 +152,8 @@ export function VoiceStreamer() {
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">My voice bank</p>
                 <p className="text-xs text-muted-foreground">
-                  Record about 30 seconds of talking to save a voice copy. Save as many as
+                  Record at least 8 seconds of clear talking to save a voice copy — speak
+                  naturally, close to the mic, in a quiet spot. Save as many as
                   you like and pick one to speak the translations for this session.
                 </p>
               </div>
@@ -223,7 +224,7 @@ export function VoiceStreamer() {
                   Stop &amp; save
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  Recording {secondsRecorded}s {secondsRecorded < 15 && "(keep going, 15s minimum)"}
+                  Recording {secondsRecorded}s {secondsRecorded < 8 && "(keep going, 8s minimum)"}
                 </span>
               </div>
             ) : (
