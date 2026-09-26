@@ -34,6 +34,7 @@ export function VoiceStreamer() {
     startSampling,
     stopSampling,
     retryUpload,
+    saveSample,
     removeVoice,
     dismissError,
   } = useVoiceClone();
@@ -48,6 +49,8 @@ export function VoiceStreamer() {
     stopRecording,
     getAudioLevels,
     isRecording,
+    sessionAudio,
+    clearSessionAudio,
   } = useVoiceTranslation({
     sourceLang,
     targetLang,

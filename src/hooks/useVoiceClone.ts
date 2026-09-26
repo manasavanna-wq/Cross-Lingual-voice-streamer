@@ -293,6 +293,7 @@ export function useVoiceClone() {
     startSampling,
     stopSampling,
     retryUpload,
+    saveSample,
     removeVoice,
     renameVoice,
     clearAll,
