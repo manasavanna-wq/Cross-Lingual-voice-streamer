@@ -44,6 +44,9 @@ export function useVoiceTranslation({
   const lastTranslationTimeRef = useRef(0);
   const translationDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const accumulatedTextRef = useRef("");
+  const sessionChunksRef = useRef<Blob[]>([]);
+  const sessionStartRef = useRef(0);
+  const [sessionAudio, setSessionAudio] = useState<{ blob: Blob; seconds: number } | null>(null);
 
   const updateStatus = useCallback((newStatus: TranslationStatus) => {
     setStatus(newStatus);
@@ -225,6 +228,24 @@ export function useVoiceTranslation({
         } 
       });
       streamRef.current = stream;
+
+      // Capture the hearer's raw voice so it can be saved to the voice bank
+      setSessionAudio(null);
+      sessionChunksRef.current = [];
+      sessionStartRef.current = Date.now();
+      try {
+        const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(
+          (t) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(t)
+        );
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) sessionChunksRef.current.push(e.data);
+        };
+        recorder.start(1000);
+      } catch {
+        mediaRecorderRef.current = null;
+      }
 
       // Set up audio analyzer for visualization
       audioContextRef.current = new AudioContext();
