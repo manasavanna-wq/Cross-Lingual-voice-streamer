@@ -3,7 +3,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 const BANK_KEY = "trans-web-voice-bank";
 const SELECTED_KEY = "trans-web-voice-selected";
 const LEGACY_KEY = "trans-web-cloned-voice";
-const MIN_SECONDS = 15;
+const MIN_SECONDS = 8;
 const MAX_SECONDS = 45;
 
 export interface SavedVoice {
