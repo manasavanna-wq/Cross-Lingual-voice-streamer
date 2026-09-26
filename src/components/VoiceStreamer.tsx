@@ -215,6 +215,30 @@ export function VoiceStreamer() {
               </div>
             )}
 
+            {sessionAudio && !isRecording && !isSampling && !isCloning && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
+                <p className="text-sm text-foreground flex-1">
+                  Your last session recorded {sessionAudio.seconds}s of your voice.
+                  {sessionAudio.seconds < 8 && " Talk a bit longer (8s minimum) to save it."}
+                </p>
+                <Button
+                  size="sm"
+                  disabled={sessionAudio.seconds < 8}
+                  onClick={() => {
+                    saveSample(sessionAudio.blob, newVoiceName);
+                    setNewVoiceName("");
+                    clearSessionAudio();
+                  }}
+                >
+                  <Mic className="w-4 h-4 mr-1" />
+                  Save as my voice
+                </Button>
+                <Button size="sm" variant="ghost" onClick={clearSessionAudio} aria-label="Discard session recording">
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+
             {isCloning ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
